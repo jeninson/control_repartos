@@ -1,4 +1,4 @@
-# CONTROL DE REPARTOS — V1.6.16
+# CONTROL DE REPARTOS — V1.6.17
 
 Sistema web local para la gestión operativa de guías, repartidores, asignaciones, entregas, devoluciones, recaudos, arqueos y cierres de caja. La aplicación está diseñada para funcionar inicialmente en un solo computador, utilizando almacenamiento local y copias de seguridad en JSON, sin depender de un servidor para la operación diaria.
 
@@ -155,9 +155,14 @@ Una misma Fecha de operación puede tener varias planillas. Dashboard, Guías, A
 - README actualizado y renombrado como `README.txt`.
 - Incorporación de identidad visual renovada para Control de Repartos.
 
+### V1.6.17
+- Incorporación del logotipo definitivo de Control de Repartos en la interfaz y como favicon.
+- Ajuste visual del área de marca para una presentación más profesional y consistente con la identidad gráfica.
+- El recurso principal de identidad visual es `LogoControlRepartos.png`.
+
 ## Identidad visual
 
-El proyecto incorpora el nuevo recurso `LogoControlRepartos.svg` y su versión PNG `LogoControlRepartos.png`, utilizados para una presentación más profesional de la aplicación.
+El proyecto incorpora el logotipo definitivo `LogoControlRepartos.png`, utilizado en la interfaz principal y como favicon para reforzar la identidad visual de la aplicación.
 
 ## Tecnologías
 
