@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de Repartos</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<div id="toast"></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brandmark">CR</div>
+      <div><strong>Control de Repartos</strong><small>Operación local</small></div>
+    </div>
+
+    <nav id="nav">
+      <button class="nav active" data-view="dashboard">⌂ <span>Dashboard</span></button>
+      <button class="nav" data-view="importar">⇩ <span>Importar jornada</span></button>
+      <button class="nav" data-view="guias">▦ <span>Guías</span></button>
+      <button class="nav" data-view="repartidores">♟ <span>Repartidores</span></button>
+      <button class="nav" data-view="asignacion">⌁ <span>Asignaciones</span></button>
+      <button class="nav" data-view="arqueo">⌗ <span>Arqueo</span></button>
+      <button class="nav" data-view="cierre">＄ <span>Cierre de caja</span></button>
+      <button class="nav" data-view="historico">◷ <span>Histórico</span></button>
+      <button class="nav" data-view="backup">⬡ <span>Copias de seguridad</span></button>
+    </nav>
+
+    <div class="side-foot">
+      <small>Datos almacenados en este computador</small>
+      <span id="dbStatus" class="db-ok">● Base local activa</span>
+      <small class="side-foot">By Jeninson Peralta &#174;</small>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSubtitle">Resumen operativo de la jornada</p>
+      </div>
+      <div class="top-actions">
+        <span id="todayLabel" class="today"></span>
+        <button class="btn ghost" id="btnQuickBackup">Respaldo</button>
+      </div>
+    </header>
+
+    <section id="view-dashboard" class="view active"></section>
+    <section id="view-importar" class="view"></section>
+    <section id="view-guias" class="view"></section>
+    <section id="view-repartidores" class="view"></section>
+    <section id="view-asignacion" class="view"></section>
+    <section id="view-arqueo" class="view"></section>
+    <section id="view-cierre" class="view"></section>
+    <section id="view-historico" class="view"></section>
+    <section id="view-backup" class="view"></section>
+  </main>
+</div>
+
+<dialog id="returnDialog">
+  <form id="returnForm" class="dialog-card">
+    <h3>Registrar devolución</h3>
+    <p id="returnGuideText"></p>
+    <label>Motivo de devolución
+      <select id="returnReason" required>
+        <option value="">Seleccione...</option>
+        <option>Cliente ausente</option>
+        <option>No contesta</option>
+        <option>Dirección incorrecta</option>
+        <option>Rechazado por cliente</option>
+        <option>Dinero insuficiente</option>
+        <option>Reprogramado</option>
+        <option>Zona/Dirección no localizada</option>
+        <option>Otro</option>
+      </select>
+    </label>
+    <label id="otherReasonWrap" class="hidden">Observación
+      <input id="returnOther" maxlength="160" placeholder="Describa el motivo">
+    </label>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="cancelReturn">Cancelar</button>
+      <button type="button" class="btn primary" id="confirmReturn">Confirmar devolución</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="guideTraceDialog"><div class="trace-card"><div id="guideTraceBody"></div></div></dialog>
+<script src="app.js"></script>
+</body>
+</html>
