@@ -687,7 +687,16 @@ async function renderGuias(){
     if(q)gs=gs.filter(g=>[g.numeroGuia,g.destinatario,g.direccion,g.remitente,g.ciudad].some(v=>String(v||"").toLowerCase().includes(q)));
     const rm=new Map(reps.map(r=>[r.id,r.nombre]));
     $("#guideTable").innerHTML=gs.length?`<div class="table-wrap"><table><thead><tr><th>Guía</th><th>Estado</th><th>Repartidor</th><th>Destinatario</th><th>Planilla</th><th>Ciudad</th><th class="right">Recaudo</th><th>Acción</th></tr></thead><tbody>${gs.map(g=>{const j=js.find(x=>x.id===g.jornadaId);return `<tr><td><strong>${esc(g.numeroGuia)}</strong></td><td>${statusBadge(g.estado)}</td><td>${esc(rm.get(g.repartidorId)||"—")}</td><td>${esc(g.destinatario)}</td><td>${esc(j?.numeroPlanilla||"—")}</td><td>${esc(g.ciudad||"—")}</td><td class="money">${money(g.valorRecaudo)}</td><td><button class="btn" data-guide-detail="${esc(g.id)}">Ver</button></td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty">No hay registros para la Fecha de operación y filtros seleccionados.</div>`;
-    $$('[data-guide-detail]').forEach(b=>b.onclick=()=>openGuideTrace(b.dataset.guideDetail));
+    // Delegación de eventos para garantizar que el botón Ver funcione aunque
+    // la tabla se haya reconstruido dinámicamente.
+    $$('#guideTable [data-guide-detail]').forEach(b=>{
+      b.onclick=async e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        try{ await openGuideTrace(b.getAttribute('data-guide-detail')); }
+        catch(err){ console.error('Error abriendo detalle de guía:',err); toast('No fue posible abrir los detalles de la guía','err'); }
+      };
+    });
   };
   $("#guideDate").onchange=async e=>{lastGuideDate=e.target.value||todayISO();await renderGuias()};
   $("#guideJourney").onchange=update;
@@ -727,8 +736,12 @@ async function openGuideTrace(guideId=null){
     return;
   }
   const g=await getOne("guias",guideId);
-  if(!g){toast("Guía no encontrada","err");return}
+  if(!g){toast("Guía no encontrada en la base local","err");return}
+  // Si el diálogo quedó abierto por una consulta anterior, se reutiliza de
+  // forma segura antes de mostrar nuevamente el detalle.
+  if(dialog.open) dialog.close();
   await renderGuideTraceDetail(g,fecha,rm,dialog,body);
+  if(!dialog.open) dialog.showModal();
 }
 
 async function renderGuideTraceDetail(g,fecha,rm,dialog,body){

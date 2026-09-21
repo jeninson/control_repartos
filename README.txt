@@ -1,6 +1,12 @@
-# CONTROL DE REPARTOS — V1.6.17
+# CONTROL DE REPARTOS — V1.6.18
 
 Sistema web local para la gestión operativa de guías, repartidores, asignaciones, entregas, devoluciones, recaudos, arqueos y cierres de caja. La aplicación está diseñada para funcionar inicialmente en un solo computador, utilizando almacenamiento local y copias de seguridad en JSON, sin depender de un servidor para la operación diaria.
+
+
+## V1.6.18
+- Corrección del botón **Ver** en el listado de Guías.
+- La consulta de una guía desde el listado abre correctamente la ventana modal de detalles.
+- Se conserva la consulta por Fecha de operación y la trazabilidad existente.
 
 ## Objetivo
 Centralizar el control de las guías y paquetes desde la importación de la planilla hasta la asignación al repartidor, seguimiento del estado, legalización de devoluciones, control de recaudo, arqueo y cierre de caja. La aplicación también permite consultar información histórica por Fecha de operación y generar respaldos del consolidado.
