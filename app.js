@@ -1152,7 +1152,7 @@ async function renderBackup(){
   $("#view-backup").innerHTML=`
     <div class="grid two">
       <div class="card"><h2>Exportar</h2><p class="muted">Descargue copias JSON que podrá restaurar posteriormente.</p>
-        <div class="grid"><button id="backupDay" class="btn primary">Exportar jornada activa</button><button id="backupAll" class="btn">Exportar base completa</button></div>
+        <div class="grid"><button id="backupDay" class="btn primary">Exportar jornada activa</button><button id="backupAll" class="btn success">Exportar base completa</button></div>
       </div>
       <div class="card"><h2>Restaurar</h2><p class="muted">La restauración agrega/actualiza registros usando sus identificadores. Se recomienda exportar una copia completa antes.</p>
         <input type="file" id="restoreFile" accept=".json"><div id="restoreInfo" style="margin-top:12px"></div>
