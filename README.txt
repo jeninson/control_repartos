@@ -1,4 +1,11 @@
-# CONTROL DE REPARTOS — V1.6.18
+# CONTROL DE REPARTOS — V1.6.19
+
+## V1.6.19
+- La sección **Copias de seguridad** incorpora selección de **Fecha de operación** mediante calendario.
+- Se mantiene la opción de **Respaldo completo** de toda la base local.
+- El respaldo por Fecha de operación consolida todas las planillas, guías, arqueos, cierres, eventos y repartidores relacionados con la fecha seleccionada.
+- El respaldo rápido superior continúa disponible para la jornada activa.
+
 
 Sistema web local para la gestión operativa de guías, repartidores, asignaciones, entregas, devoluciones, recaudos, arqueos y cierres de caja. La aplicación está diseñada para funcionar inicialmente en un solo computador, utilizando almacenamiento local y copias de seguridad en JSON, sin depender de un servidor para la operación diaria.
 
@@ -116,7 +123,7 @@ Los lectores de código de barras pueden entregar números con un formato difere
 
 ## Almacenamiento y respaldo
 
-La operación se mantiene local en el computador. Los datos relevantes se almacenan en la base local del navegador y la aplicación dispone de una opción de respaldo para conservar el consolidado. El JSON funciona como copia de seguridad y mecanismo de persistencia externa del consolidado; no requiere un servidor para la operación inicial.
+La operación se mantiene local en el computador. Los datos relevantes se almacenan en la base local del navegador y la aplicación dispone de respaldos JSON. En **Copias de seguridad** se puede seleccionar una Fecha de operación mediante calendario para exportar únicamente la información de todas las planillas de esa fecha, y se conserva la opción de **Respaldo completo** para exportar toda la base local. El JSON funciona como copia de seguridad y mecanismo de persistencia externa del consolidado; no requiere un servidor para la operación inicial.
 
 ## Operación con múltiples planillas
 

@@ -2,7 +2,7 @@
 const DB_NAME = "control_repartos_local";
 const DB_VERSION = 1;
 const STORES = ["jornadas","guias","repartidores","arqueos","cierres","eventos"];
-let db, pendingImport=null, pendingReturnGuide=null, lastAuditRepId=null, lastAuditDate=null, lastAssignmentDate=null, lastDashboardDate=null, lastGuideDate=null, guideTraceTarget=null;
+let db, pendingImport=null, pendingReturnGuide=null, lastAuditRepId=null, lastAuditDate=null, lastAssignmentDate=null, lastDashboardDate=null, lastGuideDate=null, lastBackupDate=null, guideTraceTarget=null;
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1128,7 +1128,7 @@ async function renderHistorico(){
       </tbody></table></div>`:`<div class="empty">No hay jornadas importadas.</div>`}
     </div>`;
 }
-async function collectBackup(scope="all"){
+async function collectBackup(scope="all", fecha=null){
   const data={version:"1.0",generadoEn:nowISO(),tipo:scope,data:{}};
   for(const s of STORES)data.data[s]=await getAll(s);
   if(scope==="current"){
@@ -1140,6 +1140,20 @@ async function collectBackup(scope="all"){
       data.data.eventos=data.data.eventos.filter(x=>x.jornadaId===j.id);
     }
   }
+  if(scope==="date"){
+    const f=fecha||todayISO();
+    const jornadas=data.data.jornadas.filter(x=>x.fechaPlanilla===f);
+    const ids=new Set(jornadas.map(x=>x.id));
+    const guias=data.data.guias.filter(x=>ids.has(x.jornadaId));
+    const repIds=new Set(guias.map(x=>x.repartidorId).filter(Boolean));
+    data.data.jornadas=jornadas;
+    data.data.guias=guias;
+    data.data.arqueos=data.data.arqueos.filter(x=>ids.has(x.jornadaId));
+    data.data.cierres=data.data.cierres.filter(x=>ids.has(x.jornadaId));
+    data.data.eventos=data.data.eventos.filter(x=>ids.has(x.jornadaId));
+    data.data.repartidores=data.data.repartidores.filter(x=>repIds.has(x.id));
+    data.fechaOperacion=f;
+  }
   return data;
 }
 function downloadJSON(obj,name){
@@ -1149,16 +1163,41 @@ async function backupCurrent(){const j=await currentJornada();if(!j){toast("No h
 $("#btnQuickBackup").onclick=backupCurrent;
 
 async function renderBackup(){
+  const dates=[...new Set((await getAll("jornadas")).map(j=>j.fechaPlanilla).filter(Boolean))].sort().reverse();
+  const fechaInicial=lastBackupDate||todayISO();
   $("#view-backup").innerHTML=`
     <div class="grid two">
-      <div class="card"><h2>Exportar</h2><p class="muted">Descargue copias JSON que podrá restaurar posteriormente.</p>
-        <div class="grid"><button id="backupDay" class="btn primary">Exportar jornada activa</button><button id="backupAll" class="btn success">Exportar base completa</button></div>
+      <div class="card"><h2>Exportar</h2><p class="muted">Genere un respaldo de una Fecha de operación específica o de toda la base de datos.</p>
+        <div class="toolbar">
+          <label>Fecha de operación
+            <input type="date" id="backupDate" value="${fechaInicial}">
+          </label>
+          <div class="field" style="align-self:end"><span>Fechas con información</span><strong>${dates.length}</strong></div>
+        </div>
+        <div id="backupDateInfo" class="notice" style="margin-bottom:12px"></div>
+        <div class="grid"><button id="backupDay" class="btn primary">Exportar operación seleccionada</button><button id="backupAll" class="btn success">Exportar base completa</button></div>
       </div>
       <div class="card"><h2>Restaurar</h2><p class="muted">La restauración agrega/actualiza registros usando sus identificadores. Se recomienda exportar una copia completa antes.</p>
         <input type="file" id="restoreFile" accept=".json"><div id="restoreInfo" style="margin-top:12px"></div>
       </div>
     </div>`;
-  $("#backupDay").onclick=backupCurrent;
+  const updateBackupInfo=async()=>{
+    const f=$("#backupDate").value||todayISO();
+    lastBackupDate=f;
+    const js=await jornadasPorFechaOperacion(f);
+    const gs=await guiasPorFechaOperacion(f);
+    $("#backupDateInfo").innerHTML=js.length
+      ? `<strong>${js.length} planilla(s)</strong> · ${gs.length} guía(s) · Fecha de operación ${fmtDate(f)}`
+      : `No hay planillas registradas para ${fmtDate(f)}. Puede seleccionar otra fecha.`;
+    $("#backupDay").disabled=!js.length;
+  };
+  $("#backupDate").onchange=updateBackupInfo;
+  $("#backupDay").onclick=async()=>{
+    const f=$("#backupDate").value||todayISO();
+    const js=await jornadasPorFechaOperacion(f);
+    if(!js.length){toast("No hay planillas para la Fecha de operación seleccionada","err");return}
+    downloadJSON(await collectBackup("date",f),`Respaldo_${f}_Operaciones.json`);toast("Respaldo de la operación generado");
+  };
   $("#backupAll").onclick=async()=>{downloadJSON(await collectBackup("all"),`Respaldo_Completo_${todayISO()}.json`);toast("Respaldo completo generado")};
   $("#restoreFile").onchange=async e=>{
     const f=e.target.files[0];if(!f)return;
@@ -1169,8 +1208,8 @@ async function renderBackup(){
       $("#restoreInfo").innerHTML=`<div class="notice">Restauración completada.</div>`;toast("Copia restaurada");
     }catch(err){$("#restoreInfo").innerHTML=`<div class="notice danger">${esc(err.message)}</div>`}
   };
+  await updateBackupInfo();
 }
-
 (async function init(){
   try{
     await openDB();await normalizeExistingGuides();$("#todayLabel").textContent=new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
