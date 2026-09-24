@@ -115,6 +115,7 @@ const viewInfo={
  asignacion:["Asignaciones","Asignación física mediante lector de código de barras"],
  arqueo:["Arqueo","Lectura de devoluciones y confirmación masiva de entregas"],
  cierre:["Cierre de caja","Recaudo y legalización por repartidor"],
+ nomina:["Nómina","Liquidación semanal de repartidores y desprendibles de pago"],
  historico:["Histórico","Jornadas y resultados anteriores"],
  backup:["Copias de seguridad","Exportar y restaurar información local"]
 };
@@ -135,6 +136,7 @@ async function render(v){
   if(v==="asignacion") return renderAsignacion();
   if(v==="arqueo") return renderArqueo();
   if(v==="cierre") return renderCierre();
+  if(v==="nomina") return renderNomina();
   if(v==="historico") return renderHistorico();
   if(v==="backup") return renderBackup();
 }
@@ -1087,7 +1089,7 @@ async function renderCierre(){
       <h3>Forma de pago de las entregas con recaudo</h3>
       <div class="toolbar"><button class="btn" id="allCash" ${(cierre||!paid.length)?"disabled":""}>Marcar seleccionadas: Efectivo</button><button class="btn" id="allLink" ${(cierre||!paid.length)?"disabled":""}>Marcar seleccionadas: Link de Pago</button><button class="btn" id="allTransfer" ${(cierre||!paid.length)?"disabled":""}>Marcar seleccionadas: Transferencia</button></div>
       <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="checkAllPaid" ${(cierre||!paid.length)?"disabled":""}></th><th>Guía</th><th>Destinatario</th><th class="right">Valor</th><th>Forma de pago</th></tr></thead><tbody>
-        ${paid.length?paid.map(g=>`<tr><td><input class="paidCheck" type="checkbox" value="${g.id}" ${cierre?"disabled":""}></td><td>${esc(g.numeroGuia)}</td><td>${esc(g.destinatario)}</td><td class="money">${money(g.valorRecaudo)}</td><td><select class="paySelect" data-id="${g.id}" ${cierre?"disabled":""}><option value="">Seleccione...</option><option value="EFECTIVO" ${g.medioPago==="EFECTIVO"?"selected":""}>Efectivo</option><option value="TRANSFERENCIA" ${g.medioPago==="TRANSFERENCIA"?"selected":""}>Transferencia</option><option value="LINK_PAGO" ${g.medioPago==="LINK_PAGO"?"selected":""}>Link de Pago</option></select></td></tr>`).join(""):`<tr><td colspan="5" class="center muted">No hay entregas con recaudo.</td></tr>`}
+        ${paid.length?paid.map(g=>`<tr class="pay-row ${g.medioPago==="EFECTIVO"?"pay-efectivo":g.medioPago==="TRANSFERENCIA"?"pay-transferencia":g.medioPago==="LINK_PAGO"?"pay-link":""}"><td><input class="paidCheck" type="checkbox" value="${g.id}" ${cierre?"disabled":""}></td><td>${esc(g.numeroGuia)}</td><td>${esc(g.destinatario)}</td><td class="money">${money(g.valorRecaudo)}</td><td><select class="paySelect" data-id="${g.id}" ${cierre?"disabled":""}><option value="">Seleccione...</option><option value="EFECTIVO" ${g.medioPago==="EFECTIVO"?"selected":""}>Efectivo</option><option value="TRANSFERENCIA" ${g.medioPago==="TRANSFERENCIA"?"selected":""}>Transferencia</option><option value="LINK_PAGO" ${g.medioPago==="LINK_PAGO"?"selected":""}>Link de Pago</option></select></td></tr>`).join(""):`<tr><td colspan="5" class="center muted">No hay entregas con recaudo.</td></tr>`}
       </tbody></table></div>
       <div class="grid four" style="margin-top:14px"><div class="card"><span class="muted">Efectivo</span><div class="big-number" style="font-size:22px">${money(efe)}</div></div><div class="card"><span class="muted">Transferencia</span><div class="big-number" style="font-size:22px">${money(tra)}</div></div><div class="card"><span class="muted">Link de Pago</span><div class="big-number" style="font-size:22px">${money(link)}</div></div><div class="card"><span class="muted">Sin clasificar</span><div class="big-number" style="font-size:22px">${untyped.length}</div></div></div>
       <div class="hr"></div>
@@ -1111,6 +1113,113 @@ async function renderCierre(){
     });
   }
 }
+
+async function renderNomina(){
+  const root=$("#view-nomina");
+  const js=await getAll("jornadas");
+  const dates=[...new Set(js.map(j=>j.fechaPlanilla).filter(Boolean))].sort();
+  const today=todayISO();
+  // Default to the current Monday-Saturday week; user may change either date freely.
+  const d=new Date(today+"T00:00:00");
+  const day=d.getDay();
+  const diff=day===0?-6:1-day;
+  const monday=new Date(d); monday.setDate(d.getDate()+diff);
+  const defaultFrom=dates.length?`${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,"0")}-${String(monday.getDate()).padStart(2,"0")}`:today;
+  const sat=new Date(monday); sat.setDate(monday.getDate()+5);
+  const defaultTo=`${sat.getFullYear()}-${String(sat.getMonth()+1).padStart(2,"0")}-${String(sat.getDate()).padStart(2,"0")}`;
+  const from=window.nominaFrom||defaultFrom, to=window.nominaTo||defaultTo;
+  root.innerHTML=`
+    <div class="card">
+      <div class="toolbar">
+        <label>Desde <input type="date" id="nominaFrom" value="${from}"></label>
+        <label>Hasta <input type="date" id="nominaTo" value="${to}"></label>
+        <button class="btn primary" id="nominaConsultar">Consultar periodo</button>
+      </div>
+      <div class="notice">El periodo es configurable. Por defecto se propone lunes a sábado, pero puede incluir domingo u otras fechas.</div>
+    </div>
+    <div id="nominaBody" style="margin-top:16px"></div>`;
+  const renderBody=async()=>{
+    const f=$("#nominaFrom").value, t=$("#nominaTo").value;
+    window.nominaFrom=f; window.nominaTo=t;
+    if(!f||!t||f>t){$("#nominaBody").innerHTML='<div class="card notice danger">Seleccione un periodo válido.</div>';return}
+    const allGuides=await getAll("guias"), allClosures=await getAll("cierres"), reps=await getAll("repartidores");
+    const js2=js.filter(j=>j.fechaPlanilla>=f&&j.fechaPlanilla<=t);
+    const ids=new Set(js2.map(j=>j.id));
+    const closures=allClosures.filter(c=>ids.has(c.jornadaId));
+    const repMap=new Map(reps.map(r=>[r.id,r]));
+    const grouped=new Map();
+    for(const c of closures){
+      if(!c.repartidorId) continue;
+      const key=c.repartidorId;
+      if(!grouped.has(key)) grouped.set(key,{rid:key,nombre:repMap.get(key)?.nombre||key,ident:repMap.get(key)?.identificacion||"",dias:[],guias:0,total:0});
+      const x=grouped.get(key);
+      const tarifa=Number(c.tarifaPorGuia||0), n=Number(c.guiasEntregadas||0);
+      x.guias+=n; x.total+=Number(c.totalPagoRepartidor!=null?c.totalPagoRepartidor:n*tarifa);
+      const j=js2.find(z=>z.id===c.jornadaId);
+      x.dias.push({fecha:j?.fechaPlanilla||"",n,tarifa,total:Number(c.totalPagoRepartidor!=null?c.totalPagoRepartidor:n*tarifa)});
+    }
+    const rows=[...grouped.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    const totalGuias=rows.reduce((a,x)=>a+x.guias,0), totalPago=rows.reduce((a,x)=>a+x.total,0);
+    const openRepIds=[...new Set(allGuides.filter(g=>{const j=js2.find(x=>x.id===g.jornadaId);return !!j&&g.repartidorId}).map(g=>g.repartidorId))];
+    const missing=openRepIds.filter(rid=>!closures.some(c=>c.repartidorId===rid&&ids.has(c.jornadaId)));
+    $("#nominaBody").innerHTML=`
+      <div class="grid kpis">
+        <div class="card kpi"><div class="label">REPARTIDORES</div><div class="value">${rows.length}</div></div>
+        <div class="card kpi"><div class="label">GUÍAS ENTREGADAS</div><div class="value">${totalGuias}</div></div>
+        <div class="card kpi"><div class="label">TOTAL A PAGAR</div><div class="value" style="font-size:23px">${money(totalPago)}</div></div>
+        <div class="card kpi"><div class="label">CIERRES PENDIENTES</div><div class="value">${missing.length}</div></div>
+      </div>
+      ${missing.length?`<div class="notice warning" style="margin-top:16px">Hay ${missing.length} repartidor(es) con operación en el periodo que aún no tienen cierre de caja. La liquidación no se marcará como aprobada hasta completar los cierres.</div>`:""}
+      <div class="card" style="margin-top:16px"><div class="toolbar"><h2 style="margin:0;flex:1">Liquidación del periodo</h2><button class="btn primary" id="nominaPdfAll" ${rows.length?'':'disabled'}>PDF consolidado</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Repartidor</th><th>Identificación</th><th>Guías entregadas</th><th>Tarifa</th><th>Total a pagar</th><th></th></tr></thead><tbody>
+      ${rows.length?rows.map((r,i)=>{const tarifa=r.dias.length?r.dias[r.dias.length-1].tarifa:0;return `<tr><td><strong>${esc(r.nombre)}</strong></td><td>${esc(r.ident)}</td><td>${r.guias}</td><td class="money">${money(tarifa)}</td><td class="money"><strong>${money(r.total)}</strong></td><td><button class="btn" data-pdf-rep="${esc(r.rid)}">Desprendible PDF</button></td></tr>`}).join(""):`<tr><td colspan="6" class="center muted">No hay cierres de caja en el periodo seleccionado.</td></tr>`}
+      </tbody></table></div></div>`;
+    const makePdf=async(r)=>{
+      if(!window.jspdf?.jsPDF){toast("No está disponible el generador PDF","err");return}
+      const {jsPDF}=window.jspdf, doc=new jsPDF(), rep=repMap.get(r.rid);
+      doc.setFontSize(18); doc.text("CONTROL DE REPARTOS",105,20,{align:"center"});
+      doc.setFontSize(13); doc.text("COMPROBANTE DE PAGO",105,29,{align:"center"});
+      doc.setFontSize(10);
+      doc.text(`Repartidor: ${r.nombre}`,20,45);
+      doc.text(`Identificación: ${r.ident||"—"}`,20,52);
+      doc.text(`Periodo: ${fmtDate(f)} - ${fmtDate(t)}`,20,59);
+      doc.line(20,64,190,64);
+      doc.setFontSize(11); doc.text("Detalle de liquidación",20,75);
+      let y=84; doc.setFontSize(9);
+      doc.text("Fecha",20,y);doc.text("Guías",65,y);doc.text("Tarifa",100,y);doc.text("Total",145,y);y+=7;
+      for(const x of r.dias.sort((a,b)=>a.fecha.localeCompare(b.fecha))){
+        doc.text(fmtDate(x.fecha),20,y);doc.text(String(x.n),65,y);doc.text(money(x.tarifa),100,y);doc.text(money(x.total),145,y);y+=7;
+        if(y>270){doc.addPage();y=20}
+      }
+      doc.line(20,y+2,190,y+2); y+=12;
+      doc.setFontSize(12);doc.text(`Guías entregadas: ${r.guias}`,20,y);y+=8;
+      doc.text(`TOTAL A PAGAR: ${money(r.total)}`,20,y);
+      y+=18;doc.setFontSize(9);doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`,20,y);
+      y+=22;doc.text("Firma del repartidor: ______________________________",20,y);
+      doc.save(`Desprendible_${normGuide(r.nombre).replace(/[^A-Z0-9]/gi,"_")}_${f}_${t}.pdf`);
+    };
+    $$("[data-pdf-rep]").forEach(b=>b.onclick=async()=>{const r=rows.find(x=>x.rid===b.dataset.pdfRep);if(r)await makePdf(r)});
+    $("#nominaPdfAll")?.addEventListener("click",async()=>{
+      if(!window.jspdf?.jsPDF)return;
+      const {jsPDF}=window.jspdf, doc=new jsPDF();
+      rows.forEach((r,idx)=>{
+        if(idx)doc.addPage();
+        doc.setFontSize(18);doc.text("CONTROL DE REPARTOS",105,20,{align:"center"});
+        doc.setFontSize(13);doc.text("COMPROBANTE DE PAGO",105,29,{align:"center"});
+        doc.setFontSize(10);doc.text(`Repartidor: ${r.nombre}`,20,45);doc.text(`Identificación: ${r.ident||"—"}`,20,52);doc.text(`Periodo: ${fmtDate(f)} - ${fmtDate(t)}`,20,59);
+        doc.line(20,64,190,64);doc.setFontSize(11);doc.text("Resumen",20,75);
+        doc.setFontSize(10);doc.text(`Guías entregadas: ${r.guias}`,20,88);doc.text(`Total a pagar: ${money(r.total)}`,20,97);
+        let y=110;doc.setFontSize(9);doc.text("Fecha",20,y);doc.text("Guías",65,y);doc.text("Tarifa",100,y);doc.text("Total",145,y);y+=7;
+        for(const x of r.dias.sort((a,b)=>a.fecha.localeCompare(b.fecha))){doc.text(fmtDate(x.fecha),20,y);doc.text(String(x.n),65,y);doc.text(money(x.tarifa),100,y);doc.text(money(x.total),145,y);y+=7;if(y>270)break}
+        y+=12;doc.text("Firma del repartidor: ______________________________",20,y);
+      });
+      doc.save(`Nomina_${f}_${t}.pdf`);
+    });
+  };
+  $("#nominaConsultar").onclick=renderBody;
+  await renderBody();
+}
+
 async function maybeCloseJourney(){
   const j=await currentJornada();if(!j)return;
   const gs=await guidesForJornada(j.id), rids=[...new Set(gs.filter(g=>g.repartidorId).map(g=>g.repartidorId))], cs=(await getAll("cierres")).filter(c=>c.jornadaId===j.id);

@@ -1,4 +1,13 @@
-# CONTROL DE REPARTOS — V1.6.19
+# CONTROL DE REPARTOS — V1.6.20
+
+## V1.6.20
+- Nuevo módulo **Nómina** para consolidar pagos de repartidores a partir de cierres de caja.
+- Periodo de pago configurable mediante Fecha inicial y Fecha final; por defecto propone lunes a sábado y permite incluir domingo u otras fechas.
+- Liquidación basada en guías entregadas y en la tarifa por guía almacenada en cada cierre.
+- Resumen de repartidores, guías entregadas, total a pagar y cierres pendientes.
+- Generación de desprendible individual en PDF y PDF consolidado.
+- En Cierre de caja, las filas de guías con medio de pago se resaltan visualmente: verde para Efectivo, azul para Transferencia y amarillo para Link de Pago.
+- Se mantienen los tres medios de pago: Efectivo, Transferencia y Link de Pago.
 
 ## V1.6.19
 - La sección **Copias de seguridad** incorpora selección de **Fecha de operación** mediante calendario.
@@ -59,6 +68,14 @@ Centralizar el control de las guías y paquetes desde la importación de la plan
 - Una guía solo puede quedar asociada a un repartidor en la operación correspondiente.
 - Si una nueva asignación corresponde a un repartidor que tenía un cierre de caja para esa operación, el cierre se elimina para permitir continuar la operación.
 - Estado automático: si la Fecha de operación corresponde al día actual, una guía asignada pasa a EN_REPARTO; en fechas futuras o diferentes permanece ASIGNADA.
+
+### Nómina
+- Consulta de periodos de pago configurables.
+- Consolidación de cierres de caja por repartidor.
+- Cálculo de pago por guía entregada utilizando la tarifa registrada en cada cierre.
+- Control de cierres pendientes antes de considerar completa la liquidación.
+- Generación de desprendibles individuales y PDF consolidado.
+- Preparada para futuras funciones de bonificaciones, descuentos, anticipos y otros conceptos.
 
 ### Arqueo
 - Selección de Fecha de operación.

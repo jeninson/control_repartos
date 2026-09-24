@@ -8,6 +8,7 @@
   <link rel="icon" type="image/png" href="LogoControlRepartos.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="toast"></div>
@@ -27,6 +28,7 @@
       <button class="nav" data-view="asignacion">⌁ <span>Asignaciones</span></button>
       <button class="nav" data-view="arqueo">⌗ <span>Arqueo</span></button>
       <button class="nav" data-view="cierre">＄ <span>Cierre de caja</span></button>
+      <button class="nav" data-view="nomina">▤ <span>Nómina</span></button>
       <button class="nav" data-view="historico">◷ <span>Histórico</span></button>
       <button class="nav" data-view="backup">⬡ <span>Copias de seguridad</span></button>
     </nav>
@@ -57,6 +59,7 @@
     <section id="view-asignacion" class="view"></section>
     <section id="view-arqueo" class="view"></section>
     <section id="view-cierre" class="view"></section>
+    <section id="view-nomina" class="view"></section>
     <section id="view-historico" class="view"></section>
     <section id="view-backup" class="view"></section>
   </main>

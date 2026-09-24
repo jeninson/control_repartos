@@ -38,3 +38,11 @@ dialog{border:0;border-radius:15px;box-shadow:0 24px 70px rgba(0,0,0,.25);paddin
 
 
 #guideTraceDialog{width:min(760px,94vw);max-height:90vh;overflow:auto}.trace-card{padding:24px}.trace-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--line);padding-bottom:16px}.trace-label{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.08em}.trace-number{font-size:28px;font-weight:900;letter-spacing:.03em;margin-top:4px}.trace-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}.trace-grid>div{padding:12px;background:#f7f9fc;border-radius:10px}.trace-grid small{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.trace-grid strong{font-size:14px}.trace-events{border-left:2px solid #dbe5f2;padding-left:14px;display:grid;gap:10px}.trace-event{position:relative;padding:8px 10px;background:#f8fafc;border-radius:9px}.trace-event:before{content:"";position:absolute;left:-21px;top:14px;width:9px;height:9px;border-radius:50%;background:#2563eb}.trace-event span{display:block;font-size:11px;color:var(--muted)}.trace-event strong{font-size:12px}.trace-event p{margin:4px 0 0;font-size:13px}.btn.danger{background:#fff0f1;color:#a82733;border:1px solid #f2c5ca}.btn.danger:disabled{opacity:.5;cursor:not-allowed}@media(max-width:760px){.trace-grid{grid-template-columns:1fr}.trace-number{font-size:22px}}
+
+/* V1.6.20 - identificación visual de medios de pago en Cierre de Caja */
+.pay-row.pay-efectivo > td { background: rgba(34,197,94,.16); }
+.pay-row.pay-transferencia > td { background: rgba(59,130,246,.16); }
+.pay-row.pay-link > td { background: rgba(250,204,21,.24); }
+.pay-row.pay-efectivo:hover > td { background: rgba(34,197,94,.24); }
+.pay-row.pay-transferencia:hover > td { background: rgba(59,130,246,.24); }
+.pay-row.pay-link:hover > td { background: rgba(250,204,21,.34); }
