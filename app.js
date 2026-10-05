@@ -756,12 +756,12 @@ async function renderGuideTraceDetail(g,fecha,rm,dialog,body){
     <div class="trace-grid">
       <div><small>Fecha operación</small><strong>${fmtDate(jornada?.fechaPlanilla||fecha)}</strong></div>
       <div><small>Planilla</small><strong>${esc(jornada?.numeroPlanilla||"—")}</strong></div>
-      <div><small>Repartidor</small><strong>${esc(rm.get(g.repartidorId)?.nombre||"Sin asignar")}</strong></div>
-      <div><small>Teléfono</small><strong>${esc(rm.get(g.repartidorId)?.telefono||"—")}</strong></div>
       <div><small>Destinatario</small><strong>${esc(g.destinatario||"—")}</strong></div>
+      <div><small>Dirección</small><strong>${esc(g.direccion||"—")}</strong></div>
       <div><small>Ciudad</small><strong>${esc(g.ciudad||"—")}</strong></div>
       <div><small>Valor recaudo</small><strong>${money(g.valorRecaudo)}</strong></div>
-      <div><small>Medio de pago</small><strong>${esc(g.medioPago||"Pendiente")}</strong></div>
+      <div><small>Medio de pago</small><strong>${esc(g.medioPago||"Pendiente")}</strong></div>      
+      <div><small>Repartidor</small><strong class="badge ${g.estado}">${esc(rm.get(g.repartidorId)?.nombre||"Sin asignar")}</strong></div>
     </div>
     ${g.estado==='DEVUELTO'?`<div class="notice warning"><strong>Devolución</strong><br>Motivo: ${esc(g.motivoDevolucion||"—")} ${g.observacionDevolucion?`· ${esc(g.observacionDevolucion)}`:""}<br>Legalizada: ${g.devolucionLegalizada?"Sí":"No"}</div>`:""}
     ${cierreRep?`<div class="notice warning"><strong>Caja relacionada:</strong> cerrada el ${new Date(cierreRep.cerradoEn).toLocaleString("es-CO")}.</div>`:""}
