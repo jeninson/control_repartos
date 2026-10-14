@@ -112,7 +112,7 @@ const viewInfo={
  importar:["Importar jornada","Cargar la planilla diaria de reparto"],
  guias:["Guías","Consulta y seguimiento de paquetes"],
  repartidores:["Repartidores","Base local de repartidores"],
- asignacion:["Asignaciones","Asignación física mediante lector de código de barras"],
+ asignacion:["Asignaciones","Asignación individual y masiva de guías por fecha de operación"],
  arqueo:["Arqueo","Lectura de devoluciones y confirmación masiva de entregas"],
  cierre:["Cierre de caja","Recaudo y legalización por repartidor"],
  nomina:["Nómina","Liquidación semanal de repartidores y desprendibles de pago"],
@@ -860,19 +860,167 @@ async function renderAsignacion(){
   const reps=(await getAll('repartidores')).filter(r=>r.activo);
   const fechaInicial=lastAssignmentDate || todayISO();
   const js=await jornadasPorFechaOperacion(fechaInicial);
-  js.sort((a,b)=>b.numeroPlanilla.localeCompare(a.numeroPlanilla));
+  js.sort((a,b)=>String(b.numeroPlanilla).localeCompare(String(a.numeroPlanilla)));
   const root=$('#view-asignacion');
-  root.innerHTML=`<div class="card"><div class="toolbar"><label>Fecha operación<input type="date" id="assignDate" value="${fechaInicial}"></label><div class="notice" style="flex:1;min-width:280px">Seleccione la fecha de operación. La búsqueda se realiza en todas las planillas registradas para esa fecha.</div></div></div>`;
+  root.innerHTML=`
+    <div class="card">
+      <div class="toolbar">
+        <label>Fecha operación<input type="date" id="assignDate" value="${fechaInicial}"></label>
+        <div class="notice" style="flex:1;min-width:280px">Seleccione la fecha de operación. Puede asignar guías individualmente con lector o realizar una asignación masiva por planilla.</div>
+      </div>
+    </div>`;
   $('#assignDate').onchange=async e=>{lastAssignmentDate=e.target.value||todayISO();await renderAsignacion()};
-  if(!js.length){root.insertAdjacentHTML('beforeend',`<div class="card empty" style="margin-top:16px"><h3>No existen planillas para ${fmtDate(fechaInicial)}</h3><p>Seleccione otra Fecha de operación para realizar asignaciones.</p></div>`);return}
-  root.insertAdjacentHTML('beforeend',`<div class="grid two" style="margin-top:16px"><div class="card"><h2>Asignación de guías</h2><div class="notice">Puede buscar la guía en todas las planillas de la fecha o limitar la búsqueda a una planilla específica.</div><div class="toolbar" style="margin-top:14px"><label>Planilla de búsqueda<select id="assignPlanilla"><option value="TODAS">Todas las planillas de la fecha</option>${js.map(j=>`<option value="${j.id}">${esc(j.numeroPlanilla)} · ${fmtDate(j.fechaPlanilla)}</option>`).join('')}</select></label><label class="grow">Repartidor<select id="assignRep"><option value="">Seleccione...</option>${reps.map(r=>`<option value="${r.id}">${esc(r.nombre)} · ${esc(r.identificacion)}</option>`).join('')}</select></label></div><div class="scan-panel"><label>Guía / código de barras<input id="assignScan" class="scan-input" autocomplete="off" placeholder="Escanee o digite la guía..." disabled></label><button id="assignManualBtn" class="btn primary" style="margin-top:10px" disabled>Buscar guía manual</button><div id="assignResult" class="scan-result">Seleccione repartidor para iniciar.</div></div></div><div class="card"><h3>Resumen del repartidor</h3><div id="assignSummary"></div></div></div>`);
+  if(!js.length){
+    root.insertAdjacentHTML('beforeend',`<div class="card empty" style="margin-top:16px"><h3>No existen planillas para ${fmtDate(fechaInicial)}</h3><p>Seleccione otra Fecha de operación para realizar asignaciones.</p></div>`);
+    return;
+  }
+  root.insertAdjacentHTML('beforeend',`
+    <div class="card" style="margin-top:16px">
+      <div class="segmented" id="assignMode" role="tablist" aria-label="Modo de asignación">
+        <button type="button" class="btn primary" data-mode="individual">Asignación individual</button>
+        <button type="button" class="btn" data-mode="masiva">Asignación masiva por planilla</button>
+      </div>
+    </div>
+    <div id="assignIndividualPanel" style="margin-top:16px"></div>
+    <div id="assignMassPanel" style="margin-top:16px;display:none"></div>`);
+
+  const individualPanel=$('#assignIndividualPanel'), massPanel=$('#assignMassPanel');
+  individualPanel.innerHTML=`
+    <div class="grid two">
+      <div class="card">
+        <h2>Asignación individual</h2>
+        <div class="notice">Puede buscar la guía en todas las planillas de la fecha o limitar la búsqueda a una planilla específica.</div>
+        <div class="toolbar" style="margin-top:14px">
+          <label>Planilla de búsqueda<select id="assignPlanilla"><option value="TODAS">Todas las planillas de la fecha</option>${js.map(j=>`<option value="${j.id}">${esc(j.numeroPlanilla)} · ${fmtDate(j.fechaPlanilla)}</option>`).join('')}</select></label>
+          <label class="grow">Repartidor<select id="assignRep"><option value="">Seleccione...</option>${reps.map(r=>`<option value="${r.id}">${esc(r.nombre)} · ${esc(r.identificacion)}</option>`).join('')}</select></label>
+        </div>
+        <div class="scan-panel">
+          <label>Guía / código de barras<input id="assignScan" class="scan-input" autocomplete="off" placeholder="Escanee o digite la guía..." disabled></label>
+          <button id="assignManualBtn" class="btn primary" style="margin-top:10px" disabled>Buscar guía manual</button>
+          <div id="assignResult" class="scan-result">Seleccione repartidor para iniciar.</div>
+        </div>
+      </div>
+      <div class="card"><h3>Resumen del repartidor</h3><div id="assignSummary"></div></div>
+    </div>`;
+
+  massPanel.innerHTML=`
+    <div class="grid two">
+      <div class="card">
+        <h2>Asignación masiva por planilla</h2>
+        <div class="notice">Asigna únicamente las guías que actualmente estén PENDIENTES. Las guías ya asignadas, entregadas o devueltas no serán modificadas.</div>
+        <div class="toolbar" style="margin-top:14px">
+          <label>Planilla<select id="massPlanilla"><option value="">Seleccione...</option>${js.map(j=>`<option value="${j.id}">${esc(j.numeroPlanilla)} · ${fmtDate(j.fechaPlanilla)}</option>`).join('')}</select></label>
+          <label class="grow">Repartidor<select id="massRep"><option value="">Seleccione...</option>${reps.map(r=>`<option value="${r.id}">${esc(r.nombre)} · ${esc(r.identificacion)}</option>`).join('')}</select></label>
+        </div>
+        <div id="massSummary" class="summary-box" style="margin-top:14px"><div class="empty">Seleccione una planilla y un repartidor.</div></div>
+        <div id="massBatchWrap" class="toolbar" style="margin-top:14px;display:none"><label>Lote a revertir<select id="massBatchSelect"></select></label></div><div class="dialog-actions" style="justify-content:flex-start;margin-top:14px">
+          <button id="massAssignBtn" class="btn primary" disabled>Asignar planilla completa</button>
+          <button id="massRevertBtn" class="btn danger" disabled>Revertir asignación masiva</button>
+        </div>
+        <div id="massResult" class="scan-result" style="margin-top:12px">Seleccione los datos para consultar.</div>
+      </div>
+      <div class="card">
+        <h3>Restricciones de seguridad</h3>
+        <ul class="clean-list">
+          <li>Solo se asignan guías PENDIENTES.</li>
+          <li>No se sobrescriben asignaciones existentes.</li>
+          <li>Si existe un cierre de caja del repartidor en la fecha, se elimina y se registra la reapertura.</li>
+          <li>La reversión solo afecta guías del lote masivo que aún no estén ENTREGADAS ni DEVUELTAS.</li>
+          <li>Las guías con historial definitivo permanecen protegidas.</li>
+        </ul>
+      </div>
+    </div>`;
+
+  const setMode=(mode)=>{
+    const mass=mode==='masiva';
+    individualPanel.style.display=mass?'none':'';
+    massPanel.style.display=mass?'':'none';
+    $$('#assignMode [data-mode]').forEach(b=>b.classList.toggle('primary',b.dataset.mode===mode));
+    if(mass){refreshMass();}else{$('#assignRep')?.focus();}
+  };
+  $$('#assignMode [data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
   const repSel=$('#assignRep'),planSel=$('#assignPlanilla'),scan=$('#assignScan'),btnManual=$('#assignManualBtn'),result=$('#assignResult');
   const getAvailableGuides=async()=>{const all=await getAll('guias');return planSel.value==='TODAS'?all.filter(g=>js.some(j=>j.id===g.jornadaId)):all.filter(g=>g.jornadaId===planSel.value)};
   const showSummary=async()=>{const rid=repSel.value,all=await getAll('guias'),assigned=all.filter(g=>g.repartidorId===rid&&js.some(j=>j.id===g.jornadaId));$('#assignSummary').innerHTML=rid?`<div class="big-number">${assigned.length}</div><p class="muted">guías asignadas en la fecha seleccionada</p><div class="hr"></div><div class="split"><span>Valor responsabilidad</span><strong>${money(assigned.reduce((a,g)=>a+Number(g.valorRecaudo||0),0))}</strong></div><div class="hr"></div><table><thead><tr><th>Guía</th><th>Planilla</th></tr></thead><tbody>${assigned.slice(-8).reverse().map(g=>{const j=js.find(x=>x.id===g.jornadaId);return `<tr><td>${esc(g.numeroGuia)}</td><td>${esc(j?.numeroPlanilla||'')}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty">Seleccione un repartidor.</div>`};
-  const searchGuide=async()=>{const n=normGuide(scan.value);if(!n||!repSel.value)return;const guides=await getAvailableGuides(),g=guides.find(x=>normGuide(x.numeroGuia)===n);if(!g){result.className='scan-result err';result.textContent=`Guía ${n} no encontrada en las planillas seleccionadas.`;return}if(g.repartidorId&&g.repartidorId!==repSel.value){result.className='scan-result warn';result.textContent='La guía ya está asignada a otro repartidor en esta fecha de operación.';return}if(['ENTREGADO','DEVUELTO'].includes(g.estado)){result.className='scan-result err';result.textContent=`La guía tiene estado ${g.estado}.`;return}const fechaOp=js.find(j=>j.id===g.jornadaId)?.fechaPlanilla||fechaInicial;const cierrePrevio=await hasOpenOrClosedCaja(fechaOp,repSel.value);if(cierrePrevio){await del('cierres',cierrePrevio.id);await logEvent('REAPERTURA_CAJA',`Caja reabierta por nueva asignación de guía ${n}`,g.id,g.jornadaId)}g.repartidorId=repSel.value;g.asignadoEn=nowISO();g.estado=(fechaOp===todayISO())?'EN_REPARTO':'ASIGNADO';if(g.estado==='EN_REPARTO')g.enRepartoEn=nowISO();await put('guias',g);await logEvent('ASIGNACION',`Guía ${n} asignada`,g.id,g.jornadaId);const plan=js.find(j=>j.id===g.jornadaId);result.className='scan-result ok';result.innerHTML=`✓ <strong>${esc(g.numeroGuia)}</strong><br>Planilla: ${esc(plan?.numeroPlanilla||'')}<br>Cliente: ${esc(g.destinatario)}<br>Direccion: ${esc(g.direccion)}<br>Ciudad: ${esc(g.ciudad)}<br>Valor: ${money(g.valorRecaudo)}`;scan.value='';await showSummary();setTimeout(()=>scan.focus(),50)};
+  const searchGuide=async()=>{
+    const n=normGuide(scan.value); if(!n||!repSel.value)return;
+    const guides=await getAvailableGuides(),g=guides.find(x=>normGuide(x.numeroGuia)===n);
+    if(!g){result.className='scan-result err';result.textContent=`Guía ${n} no encontrada en las planillas seleccionadas.`;return}
+    if(g.repartidorId&&g.repartidorId!==repSel.value){result.className='scan-result warn';result.textContent='La guía ya está asignada a otro repartidor en esta fecha de operación.';return}
+    if(['ENTREGADO','DEVUELTO'].includes(g.estado)){result.className='scan-result err';result.textContent=`La guía tiene estado ${g.estado}.`;return}
+    const fechaOp=js.find(j=>j.id===g.jornadaId)?.fechaPlanilla||fechaInicial;
+    const cierrePrevio=await hasOpenOrClosedCaja(fechaOp,repSel.value);
+    if(cierrePrevio){await del('cierres',cierrePrevio.id);await logEvent('REAPERTURA_CAJA',`Caja reabierta por nueva asignación de guía ${n}`,g.id,g.jornadaId)}
+    g.repartidorId=repSel.value;g.asignadoEn=nowISO();delete g.asignacionOrigen;delete g.asignacionLoteId;delete g.asignacionLoteFecha;delete g.asignacionRepartidorId;g.estado=(fechaOp===todayISO())?'EN_REPARTO':'ASIGNADO';
+    if(g.estado==='EN_REPARTO')g.enRepartoEn=nowISO();
+    await put('guias',g);await logEvent('ASIGNACION',`Guía ${n} asignada`,g.id,g.jornadaId);
+    const plan=js.find(j=>j.id===g.jornadaId);
+    result.className='scan-result ok';result.innerHTML=`✓ <strong>${esc(g.numeroGuia)}</strong><br>Planilla: ${esc(plan?.numeroPlanilla||'')}<br>Cliente: ${esc(g.destinatario)}<br>Direccion: ${esc(g.direccion)}<br>Ciudad: ${esc(g.ciudad)}<br>Valor: ${money(g.valorRecaudo)}`;
+    scan.value='';await showSummary();setTimeout(()=>scan.focus(),50);
+  };
   repSel.onchange=()=>{scan.disabled=!repSel.value;btnManual.disabled=!repSel.value;result.textContent=repSel.value?'Lector listo. Escanee la siguiente guía.':'Seleccione repartidor.';if(repSel.value)scan.focus();showSummary()};
   planSel.onchange=()=>{result.textContent=repSel.value?'Lector listo. Escanee la siguiente guía.':'Seleccione repartidor.';showSummary()};
-  scan.onkeydown=async e=>{if(e.key==='Enter'){e.preventDefault();await searchGuide()}};btnManual.onclick=searchGuide;await showSummary();
+  scan.onkeydown=async e=>{if(e.key==='Enter'){e.preventDefault();await searchGuide()}};btnManual.onclick=searchGuide;
+
+  const massPlan=$('#massPlanilla'),massRep=$('#massRep'),massSummary=$('#massSummary'),massAssign=$('#massAssignBtn'),massRevert=$('#massRevertBtn'),massResult=$('#massResult'),massBatchWrap=$('#massBatchWrap'),massBatchSelect=$('#massBatchSelect');
+  async function getMassContext(){
+    const jid=massPlan.value,rid=massRep.value;
+    if(!jid||!rid)return null;
+    const j=js.find(x=>x.id===jid);if(!j)return null;
+    const all=(await getAll('guias')).filter(g=>g.jornadaId===jid);
+    const pending=all.filter(g=>(g.estado||'PENDIENTE')==='PENDIENTE'&&!g.repartidorId);
+    const assignedToRep=all.filter(g=>g.repartidorId===rid);
+    const assignedOther=all.filter(g=>g.repartidorId&&g.repartidorId!==rid);
+    const batchGroups=new Map();
+    all.filter(g=>g.asignacionOrigen==='MASIVA'&&g.asignacionLoteId&&g.asignacionRepartidorId===rid).forEach(g=>{if(!batchGroups.has(g.asignacionLoteId))batchGroups.set(g.asignacionLoteId,{id:g.asignacionLoteId,fecha:g.asignacionLoteFecha||g.asignadoEn,guias:[]});batchGroups.get(g.asignacionLoteId).guias.push(g)});
+    return {j,all,pending,assignedToRep,assignedOther,batchGroups};
+  }
+  async function refreshMass(){
+    const c=await getMassContext();
+    if(!c){massSummary.innerHTML='<div class="empty">Seleccione una planilla y un repartidor.</div>';massAssign.disabled=true;massRevert.disabled=true;return}
+    const batches=[...c.batchGroups.values()].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+    const selectedBatch=(massBatchSelect.value&&batches.some(b=>b.id===massBatchSelect.value))?massBatchSelect.value:(batches[0]?.id||'');
+    massBatchSelect.innerHTML=batches.map(b=>`<option value="${esc(b.id)}">${esc(b.id)} · ${b.guias.length} guías</option>`).join('');
+    if(selectedBatch) massBatchSelect.value=selectedBatch;
+    massBatchWrap.style.display=batches.length?'':'none';
+    massSummary.innerHTML=`<div class="stats-grid"><div><small>Total de guías</small><strong>${c.all.length}</strong></div><div><small>Pendientes disponibles</small><strong>${c.pending.length}</strong></div><div><small>Ya asignadas al repartidor</small><strong>${c.assignedToRep.length}</strong></div><div><small>Asignadas a otros</small><strong>${c.assignedOther.length}</strong></div></div>${batches.length?`<div class="hr"></div><strong>Lotes masivos registrados</strong><div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Lote</th><th>Guías</th><th>Estado</th></tr></thead><tbody>${batches.map(b=>{const protegidas=b.guias.filter(g=>['ENTREGADO','DEVUELTO'].includes(g.estado)).length;const reversibles=b.guias.length-protegidas;return `<tr><td>${esc(b.id)}</td><td>${b.guias.length}</td><td>${protegidas?`${protegidas} protegidas · ${reversibles} reversibles`:'Todas reversibles'}</td></tr>`}).join('')}</tbody></table></div>`:''}`;
+    massAssign.disabled=c.pending.length===0;
+    massRevert.disabled=batches.length===0;
+  }
+  massPlan.onchange=refreshMass;massRep.onchange=refreshMass;massBatchSelect.onchange=refreshMass;
+  massAssign.onclick=async()=>{
+    const c=await getMassContext();if(!c||!c.pending.length||!massRep.value)return;
+    const rep=reps.find(r=>r.id===massRep.value), count=c.pending.length;
+    if(!confirm(`Se asignarán ${count} guías de la planilla ${c.j.numeroPlanilla} al repartidor ${rep?.nombre||''}. Las guías ya asignadas no serán modificadas. ¿Desea continuar?`))return;
+    const lote=uid('LOTE');
+    const cierrePrevio=await hasOpenOrClosedCaja(c.j.fechaPlanilla,massRep.value);
+    if(cierrePrevio){await del('cierres',cierrePrevio.id);await logEvent('REAPERTURA_CAJA',`Caja reabierta por asignación masiva de planilla ${c.j.numeroPlanilla}`,null,c.j.id)}
+    const fechaOp=c.j.fechaPlanilla, assigned=[];
+    for(const g of c.pending){
+      g.repartidorId=massRep.value;g.asignadoEn=nowISO();g.asignacionOrigen='MASIVA';g.asignacionLoteId=lote;g.asignacionLoteFecha=nowISO();g.asignacionRepartidorId=massRep.value;g.estado=(fechaOp===todayISO())?'EN_REPARTO':'ASIGNADO';if(g.estado==='EN_REPARTO')g.enRepartoEn=nowISO();assigned.push(g);
+    }
+    await bulkPut('guias',assigned);
+    await logEvent('ASIGNACION_MASIVA',`Planilla ${c.j.numeroPlanilla}: ${assigned.length} guías asignadas al repartidor ${rep?.nombre||massRep.value}. Lote ${lote}`,null,c.j.id);
+    massResult.className='scan-result ok';massResult.innerHTML=`✓ Se asignaron <strong>${assigned.length}</strong> guías de la planilla <strong>${esc(c.j.numeroPlanilla)}</strong>.<br>Lote: ${esc(lote)}${cierrePrevio?'<br>Se reabrió la caja del repartidor por la nueva asignación.':''}`;
+    await refreshMass();
+  };
+  massRevert.onclick=async()=>{
+    const c=await getMassContext();if(!c)return;
+    const batches=[...c.batchGroups.values()].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+    if(!batches.length)return;
+    const b=batches.find(x=>x.id===massBatchSelect.value)||batches[0], protegidas=b.guias.filter(g=>['ENTREGADO','DEVUELTO'].includes(g.estado)), reversibles=b.guias.filter(g=>!['ENTREGADO','DEVUELTO'].includes(g.estado));
+    if(!reversibles.length){toast('No hay guías elegibles para revertir en el último lote.','err');return}
+    if((await hasOpenOrClosedCaja(c.j.fechaPlanilla,massRep.value))){toast('La caja del repartidor está cerrada. No se puede revertir el lote hasta reabrir la operación.','err');return}
+    const msg=`Lote ${b.id}: se revertirán ${reversibles.length} guías y ${protegidas.length} quedarán protegidas por su estado definitivo. ¿Continuar?`;
+    if(!confirm(msg))return;
+    for(const g of reversibles){g.repartidorId=null;g.estado='PENDIENTE';delete g.asignadoEn;delete g.enRepartoEn;g.revertidoEn=nowISO();g.revertidoDesdeLote=b.id}
+    await bulkPut('guias',reversibles);
+    await logEvent('REVERSA_ASIGNACION_MASIVA',`Planilla ${c.j.numeroPlanilla}: lote ${b.id}, ${reversibles.length} guías revertidas; ${protegidas.length} protegidas`,null,c.j.id);
+    massResult.className='scan-result ok';massResult.innerHTML=`✓ Se revirtieron <strong>${reversibles.length}</strong> guías del lote ${esc(b.id)}.${protegidas.length?`<br>${protegidas.length} guías quedaron protegidas por estar ENTREGADAS o DEVUELTAS.`:''}`;
+    await refreshMass();
+  };
+  await showSummary();await refreshMass();
 }
 
 

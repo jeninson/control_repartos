@@ -1,4 +1,15 @@
-# CONTROL DE REPARTOS — V1.6.20
+# CONTROL DE REPARTOS — V1.6.22
+
+## V1.6.22
+- En **Asignaciones** se incorpora el modo **Asignación masiva por planilla**, integrado en el mismo módulo y sin eliminar la asignación individual mediante lector o búsqueda manual.
+- La asignación masiva trabaja sobre la **Fecha de operación** seleccionada y permite escoger una planilla y un repartidor.
+- Solo se asignan guías que estén en estado **PENDIENTE** y sin repartidor; las guías ya asignadas, entregadas o devueltas no se sobrescriben.
+- La asignación masiva conserva la regla de estado: para la fecha actual las guías pasan a **EN_REPARTO** y para otras fechas permanecen **ASIGNADAS**.
+- Si el repartidor tiene un cierre de caja para la Fecha de operación, la asignación masiva elimina el cierre una sola vez y registra el evento de reapertura.
+- Cada asignación masiva genera un identificador de lote para mantener trazabilidad individual de las guías asignadas.
+- Se incorpora **Revertir asignación masiva** por lote. Solo se revierten las guías del lote que todavía no estén **ENTREGADAS** ni **DEVUELTAS**; las guías con estado definitivo quedan protegidas.
+- Las reversiones quedan registradas mediante evento de auditoría y las guías regresan a **PENDIENTE** sin repartidor.
+- Si una guía previamente perteneciente a un lote masivo se asigna posteriormente de forma individual, se eliminan sus metadatos del lote anterior para evitar reversiones incorrectas.
 
 ## V1.6.20
 - Nuevo módulo **Nómina** para consolidar pagos de repartidores a partir de cierres de caja.
